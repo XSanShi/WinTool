@@ -1,0 +1,32 @@
+<Project>
+
+  <!--
+    仓库级公共属性。
+
+    工具链注意事项（本机实测，Windows 10 19045.2913 + .NET SDK 10.0.404）：
+    官方 csc.exe / VBCSCompiler.exe 的 PE 头带有 IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS(20) = CET_COMPAT 标记，
+    而本机 Windows 尚未具备该能力，CoreCLR 启动时直接 Fatal error：
+      "Your Windows doesn't fully support CET. Please install all available Windows updates."
+    这不是本仓库代码的问题，任何 dotnet build 都会撞上。
+
+    处理办法：把 SDK 的 Roslyn 目录复制到 .toolchain\roslyn 并把该标记清零（见 .toolchain\README.md），
+    然后用 CscToolPath 指向副本、关闭共享编译（VBCSCompiler 同样带标记）。存在副本时才生效，
+    因此换一台已支持 CET 的机器时，删掉 .toolchain 即可自动回到官方编译器。
+  -->
+
+  <PropertyGroup>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- 产物 apphost 也不带 CET 标记，否则编译出来的 exe 在本机同样无法启动。 -->
+    <CETCompat>false</CETCompat>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory).toolchain\roslyn\csc.exe')">
+    <CscToolPath>$(MSBuildThisFileDirectory).toolchain\roslyn\</CscToolPath>
+    <CscToolExe>csc.exe</CscToolExe>
+    <UseSharedCompilation>false</UseSharedCompilation>
+  </PropertyGroup>
+
+</Project>

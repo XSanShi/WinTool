@@ -1,0 +1,32 @@
+# 构建产物
+bin/
+obj/
+dist/
+TestResults/
+*.trx
+
+# 本机工具链补丁（CET 修补后的 Roslyn 副本，约 43 MB，不入库）
+.toolchain/
+
+# 逆向、取证与临时脚本（参考项目样本和证据也在这里）
+.rea/
+
+# 编辑器与系统文件
+.vs/
+.idea/
+*.user
+*.suo
+Thumbs.db
+.DS_Store
+
+# 运行时数据与敏感文件（绝不应进入仓库）
+data/
+待办留底/
+vault.json
+.env
+.env.*
+*.pfx
+*.snk
+
+# 含本机绝对路径的截图，不随仓库发布
+/docs/screenshots/ui-settings.png
