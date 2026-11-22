@@ -40,6 +40,16 @@ internal sealed class TempDir : IDisposable
     }
 }
 
+internal static class TestClock
+{
+    /// <summary>构造当前测试机器所在时区的本地墙钟时间，避免 UTC CI 与 +08:00 开发机断言不一致。</summary>
+    public static DateTimeOffset Local(int year, int month, int day, int hour, int minute, int second = 0)
+    {
+        var local = new DateTime(year, month, day, hour, minute, second, DateTimeKind.Unspecified);
+        return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
+    }
+}
+
 public sealed class AtomicFileTests
 {
     [Fact]
@@ -95,7 +105,7 @@ public sealed class TodoMarkdownFormatterTests
         Id = id,
         Text = text,
         Done = true,
-        CreatedAt = DateTimeOffset.Parse("2026-11-01T09:00:00+08:00"),
+        CreatedAt = TestClock.Local(2026, 11, 1, 9, 0),
         CompletedAt = completed,
     };
 
@@ -123,7 +133,7 @@ public sealed class TodoMarkdownFormatterTests
     [Fact]
     public void 多行文本按四空格续行且不打断列表()
     {
-        var text = TodoMarkdownFormatter.FormatItem(Item("第一行\n第二行", completed: DateTimeOffset.Parse("2026-11-14T19:40:00+08:00")));
+        var text = TodoMarkdownFormatter.FormatItem(Item("第一行\n第二行", completed: TestClock.Local(2026, 11, 14, 19, 40)));
 
         var lines = text.Split('\n');
         Assert.StartsWith("- [x] 第一行（19:40 完成，id: 0123456789abcdef0123456789abcdef）", lines[0]);
@@ -141,7 +151,7 @@ public sealed class TodoMarkdownFormatterTests
     [Fact]
     public void 段头使用本地时间到分钟()
     {
-        var header = TodoMarkdownFormatter.FormatSegmentHeader(new DateTimeOffset(2026, 11, 14, 18, 57, 33, TimeSpan.FromHours(8)));
+        var header = TodoMarkdownFormatter.FormatSegmentHeader(TestClock.Local(2026, 11, 14, 18, 57, 33));
         Assert.Equal("## 2026-11-14 18:57", header);
     }
 }
@@ -159,7 +169,7 @@ public sealed class TodoRulesTests
     [Fact]
     public void 新建条目落在末尾且未完成()
     {
-        var now = DateTimeOffset.Parse("2026-11-14T10:00:00+08:00");
+        var now = TestClock.Local(2026, 11, 14, 10, 0);
         var list = new List<TodoItem>();
         list.Add(TodoRules.Create("第一条", now, list));
         list.Add(TodoRules.Create("第二条", now, list));
@@ -173,7 +183,7 @@ public sealed class TodoRulesTests
     [Fact]
     public void 勾选记录完成时刻取消勾选默认清空()
     {
-        var now = DateTimeOffset.Parse("2026-11-14T10:00:00+08:00");
+        var now = TestClock.Local(2026, 11, 14, 10, 0);
         var item = TodoRules.Create("x", now, []);
 
         Assert.True(TodoRules.SetDone(item, true, now.AddHours(1)));
@@ -191,7 +201,7 @@ public sealed class TodoRulesTests
     [Fact]
     public void 取消勾选可配置保留完成时刻()
     {
-        var now = DateTimeOffset.Parse("2026-11-14T10:00:00+08:00");
+        var now = TestClock.Local(2026, 11, 14, 10, 0);
         var item = TodoRules.Create("x", now, []);
         TodoRules.SetDone(item, true, now);
         TodoRules.SetDone(item, false, now.AddMinutes(5), clearCompletedAtOnUndo: false);
@@ -229,7 +239,7 @@ public sealed class TodoArchiveWriterTests
     {
         using var dir = new TempDir();
         var writer = new TodoArchiveWriter(new TodoArchiveOptions { Directory = dir.Path });
-        var at = new DateTimeOffset(2026, 11, 14, 18, 57, 0, TimeSpan.FromHours(8));
+        var at = TestClock.Local(2026, 11, 14, 18, 57);
 
         var outcome = writer.Write(new TodoArchiveRequest([Done("a1", "买牛奶", at)], at));
 
@@ -246,7 +256,7 @@ public sealed class TodoArchiveWriterTests
     {
         using var dir = new TempDir();
         var writer = new TodoArchiveWriter(new TodoArchiveOptions { Directory = dir.Path });
-        var at1 = new DateTimeOffset(2026, 11, 14, 18, 57, 0, TimeSpan.FromHours(8));
+        var at1 = TestClock.Local(2026, 11, 14, 18, 57);
         var at2 = at1.AddHours(3);
 
         writer.Write(new TodoArchiveRequest([Done("a1", "第一条", at1)], at1));
@@ -264,7 +274,7 @@ public sealed class TodoArchiveWriterTests
     {
         using var dir = new TempDir();
         var writer = new TodoArchiveWriter(new TodoArchiveOptions { Directory = dir.Path });
-        var at = new DateTimeOffset(2026, 11, 14, 18, 57, 0, TimeSpan.FromHours(8));
+        var at = TestClock.Local(2026, 11, 14, 18, 57);
         var item = Done("0123456789abcdef0123456789abcdef", "买牛奶", at);
 
         writer.Write(new TodoArchiveRequest([item], at));
@@ -281,8 +291,8 @@ public sealed class TodoArchiveWriterTests
     {
         using var dir = new TempDir();
         var writer = new TodoArchiveWriter(new TodoArchiveOptions { Directory = dir.Path });
-        var nov = new DateTimeOffset(2026, 11, 30, 23, 10, 0, TimeSpan.FromHours(8));
-        var dec = new DateTimeOffset(2026, 12, 1, 0, 5, 0, TimeSpan.FromHours(8));
+        var nov = TestClock.Local(2026, 11, 30, 23, 10);
+        var dec = TestClock.Local(2026, 12, 1, 0, 5);
 
         var first = writer.Write(new TodoArchiveRequest([Done("a1", "十一月", nov)], nov));
         var novHash = Hash(first.FilePath!);
@@ -302,8 +312,8 @@ public sealed class TodoArchiveWriterTests
     {
         using var dir = new TempDir();
         var writer = new TodoArchiveWriter(new TodoArchiveOptions { Directory = dir.Path });
-        var nov = new DateTimeOffset(2026, 11, 30, 23, 10, 0, TimeSpan.FromHours(8));
-        var dec = new DateTimeOffset(2026, 12, 1, 9, 0, 0, TimeSpan.FromHours(8));
+        var nov = TestClock.Local(2026, 11, 30, 23, 10);
+        var dec = TestClock.Local(2026, 12, 1, 9, 0);
         var item = Done("fedcba9876543210fedcba9876543210", "上月的条目", nov);
 
         writer.Write(new TodoArchiveRequest([item], nov));
